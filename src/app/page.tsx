@@ -4,7 +4,6 @@ import Categories from "@/components/Categories/Categories";
 import Trending from "@/components/Trending/Trending";
 import Testimonials from "@/components/Testimonials/Testimonials";
 import CTA from "@/components/CTA/CTA";
-import Footer from "@/components/Footer/Footer";
 
 export default function HomePage() {
   return (
@@ -14,8 +13,6 @@ export default function HomePage() {
       <Categories />
       <Trending />
       <Testimonials />
-      <CTA />
-      <Footer />
-    </>
+      <CTA />    </>
   );
 }
