@@ -1,33 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import CTAButton from '@/components/ui/CTAButton';
+import ShareLinkModal from '@/components/modals/ShareLinkModal';
 import { FaShareAlt, FaTag, FaCheckCircle, FaStar } from 'react-icons/fa';
 import { useCart } from '@/contexts/CartContext';
-
-// Mock Product Data (Example: The Nocturne Lumina Desk Globe)
-const mockProduct = {
-  id: 'nocturne-globe',
-  name: 'Nocturne Lumina Desk Globe',
-  price: '9,800.00',
-  sku: 'NOCT-LUM-001',
-  description: "A meticulously crafted, oversized desk globe featuring continents rendered in polished obsidian, oceans in deep, swirling sapphire resin, and major cities marked by subtle, inlaid mother-of-pearl. It rests on a brushed brass armature and a sculpted, dark walnut base. The soft, internal LED luminescence is adjustable, ensuring an ethereal glow that complements any executive space.",
-  features: [
-    'Hand-polished Obsidian Continents',
-    'Sapphire Resin Oceans with Depth Effect',
-    'Brushed Brass Armature and Walnut Base',
-    'Dimmable Internal LED Luminescence',
-  ],
-  images: [
-    'https://placehold.co/800x800/28242D/F0EAD6?text=Main+Globe',
-    'https://placehold.co/800x800/28242D/F0EAD6?text=Globe+Detail+1',
-    'https://placehold.co/800x800/28242D/F0EAD6?text=Globe+Detail+2',
-    'https://placehold.co/800x800/28242D/F0EAD6?text=Globe+Detail+3',
-  ],
-  resellerPrice: '7,500.00',
-};
+import { apiClient, Product, ProductImage } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Framer Motion Variants
 const containerVariants = {
@@ -47,9 +28,13 @@ const itemVariants = {
 };
 
 // Component for the Reseller/Affiliate Section (Explainer Box)
-const ResellerExplainerBox: React.FC = () => {
-    // In a real application, margin calculation would be dynamic
-    const potentialMargin = (parseFloat(mockProduct.price.replace(',', '')) - parseFloat(mockProduct.resellerPrice.replace(',', ''))).toFixed(2);
+const ResellerExplainerBox: React.FC<{ product: Product; onGenerateLink: () => void }> = ({ product, onGenerateLink }) => {
+    // Use reseller_price from API if available, otherwise calculate
+    const basePrice = typeof product.base_price === 'string' ? parseFloat(product.base_price) : product.base_price;
+    const resellerPriceValue = product.reseller_price 
+      ? (typeof product.reseller_price === 'string' ? parseFloat(product.reseller_price) : product.reseller_price)
+      : basePrice * 0.8; // Fallback to 20% discount if not provided
+    const potentialMargin = (basePrice - resellerPriceValue).toFixed(2);
     
     return (
         <motion.div 
@@ -63,11 +48,14 @@ const ResellerExplainerBox: React.FC = () => {
             
             <p className="font-body text-text-lavender text-sm mb-4">
                 As an approved partner, you access this item at a preferred rate of 
-                <span className="text-text-cream font-medium"> USD ${mockProduct.resellerPrice}</span>. 
+                <span className="text-text-cream font-medium"> USD ${resellerPriceValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>. 
                 This allows a potential earning margin of 
                 <span className="text-cta-copper font-medium"> USD ${potentialMargin}</span> per direct sale.
             </p>
-            <CTAButton className="w-full text-base bg-transparent border border-text-lavender text-text-lavender hover:bg-text-lavender/10">
+            <CTAButton 
+                className="w-full text-base bg-transparent border border-text-lavender text-text-lavender hover:bg-text-lavender/10"
+                onClick={onGenerateLink}
+            >
                 <FaShareAlt className="mr-2" />
                 Generate Shareable Link
             </CTAButton>
@@ -77,26 +65,151 @@ const ResellerExplainerBox: React.FC = () => {
 
 // Main PDP Component
 export default function ProductDetailPage({ params }: { params: { slug: string } }) {
-  const [mainImage, setMainImage] = useState(mockProduct.images[0]);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mainImage, setMainImage] = useState<string>('');
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const { addItem } = useCart();
+  const { isLoggedIn, user } = useAuth();
 
-  // Dynamic page title (Cormorant Garamond)
-  const PageTitle = `${mockProduct.name}`;
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        // Try to parse slug as product ID
+        const productId = parseInt(params.slug);
+        if (isNaN(productId)) {
+          throw new Error('Invalid product ID');
+        }
+
+        const response = await apiClient.getProduct(productId);
+        if (response.success && response.data) {
+          // API response structure: product fields directly on data, with images array
+          const productData = response.data;
+          const productImages = response.data.images || [];
+          
+          // Extract product (excluding images)
+          const { images: _, ...product } = productData;
+          setProduct(product as Product);
+          setImages(productImages);
+          
+          // Set main image - use first image sorted by display_order, or fallback
+          const sortedImages = productImages
+            .sort((a, b) => a.display_order - b.display_order)
+            .map((img) => img.image_url);
+          
+          // Determine main image with proper fallback chain
+          const firstImage = sortedImages[0] || 
+            productImages[0]?.image_url ||
+            productData.image_url ||
+            productData.image_urls?.[0] ||
+            'https://placehold.co/800x800/28242D/F0EAD6?text=Product';
+          
+          setMainImage(firstImage);
+        } else {
+          setError(response.message || 'Product not found');
+        }
+      } catch (err: any) {
+        console.error('Error fetching product:', err);
+        setError(err.message || 'Failed to load product');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProduct();
+  }, [params.slug]);
+
+  // Sync mainImage with images when they change
+  useEffect(() => {
+    if (images.length > 0 && !mainImage) {
+      const sortedImages = images
+        .sort((a, b) => a.display_order - b.display_order)
+        .map((img) => img.image_url);
+      
+      if (sortedImages[0]) {
+        setMainImage(sortedImages[0]);
+      }
+    }
+  }, [images, mainImage]);
 
   const handleAddToCart = () => {
-    // Generate a numeric ID from the slug or use a hash
-    const numericId = params.slug.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    if (!product) return;
+    
+    // Get the first image sorted by display_order
+    const sortedImages = images
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((img) => img.image_url);
+    
+    const imageUrl = sortedImages[0] || product.image_url || product.image_urls?.[0] || '';
+    const price = typeof product.base_price === 'string' ? parseFloat(product.base_price) : product.base_price;
+    
     addItem({
-      id: numericId,
-      name: mockProduct.name,
-      price: parseFloat(mockProduct.price.replace(',', '')),
-      imagePlaceholder: mockProduct.images[0],
+      id: product.id,
+      name: product.title,
+      price: price,
+      imagePlaceholder: imageUrl,
       slug: params.slug,
     });
   };
 
-  // Note: Structured data is now handled in layout.tsx (server component) for better SEO
-  // This ensures search engines can see it in the initial HTML
+  const handleOpenShareModal = () => {
+    if (!isLoggedIn) {
+      alert('Please login to generate share links');
+      return;
+    }
+    setIsShareModalOpen(true);
+  };
+
+  const handleCreateShareLink = async (data: {
+    product_id: number;
+    margin_amount: number;
+    expires_in_days?: number;
+  }) => {
+    const response = await apiClient.createShareLink(data);
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Failed to generate share link');
+    }
+    return response.data;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-base-navy font-body py-20 flex items-center justify-center">
+        <p className="font-body text-text-lavender text-xl">Loading product...</p>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen bg-base-navy font-body py-20 flex items-center justify-center">
+        <div className="text-center">
+          <p className="font-body text-highlight-wine text-xl mb-4">{error || 'Product not found'}</p>
+          <Link href="/shop" className="text-cta-copper hover:underline">Back to Shop</Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Get images sorted by display_order, with fallback
+  const productImages = images
+    .sort((a, b) => a.display_order - b.display_order)
+    .map((img) => img.image_url);
+  
+  const allImages = productImages.length > 0 
+    ? productImages 
+    : (product.image_url ? [product.image_url] : product.image_urls || ['https://placehold.co/800x800/28242D/F0EAD6?text=Product']);
+  
+  // Ensure mainImage is set from allImages if it's empty
+  const displayMainImage = mainImage || allImages[0] || 'https://placehold.co/800x800/28242D/F0EAD6?text=Product';
+  
+  // Handle base_price as string or number
+  const price = typeof product.base_price === 'string' ? parseFloat(product.base_price) : product.base_price;
+  const formattedPrice = price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="min-h-screen bg-base-navy font-body py-20">
@@ -108,7 +221,7 @@ export default function ProductDetailPage({ params }: { params: { slug: string }
         >
           {/* Breadcrumb / Navigation */}
           <motion.p className="text-text-lavender mb-6 text-sm" variants={itemVariants}>
-            <Link href="/shop" className="hover:text-cta-copper transition-colors">Shop</Link> / {PageTitle}
+            <Link href="/shop" className="hover:text-cta-copper transition-colors">Shop</Link> / {product.title}
           </motion.p>
 
           {/* --- Main Product Grid --- */}
@@ -117,31 +230,37 @@ export default function ProductDetailPage({ params }: { params: { slug: string }
             {/* --- Column 1: Image Gallery --- */}
             <motion.div className="mb-10 lg:mb-0" variants={itemVariants}>
               {/* Main Image View */}
-              <div className="aspect-square rounded-soft-lg overflow-hidden mb-6 shadow-luxury-soft">
+              <div className="aspect-square rounded-soft-lg overflow-hidden mb-6 shadow-luxury-soft bg-base-navy">
                 <img 
-                  src={mainImage} 
-                  alt={mockProduct.name} 
-                  className="w-full h-full object-cover" 
+                  src={displayMainImage} 
+                  alt={product.title} 
+                  className="w-full h-full object-cover"
+                  loading="eager"
                 />
               </div>
               
               {/* Thumbnail Gallery */}
-              <div className="flex space-x-4 overflow-x-auto pb-2">
-                {mockProduct.images.map((img, index) => (
-                  <motion.img
-                    key={index}
-                    src={img}
-                    alt={`${mockProduct.name} - View ${index + 1}`}
-                    className={`
-                      w-24 h-24 object-cover rounded-md cursor-pointer border-2 transition-all duration-300
-                      ${mainImage === img ? 'border-cta-copper shadow-lavender-glow' : 'border-divider-silver hover:border-text-lavender'}
-                    `}
-                    onClick={() => setMainImage(img)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  />
-                ))}
-              </div>
+              {allImages.length > 1 && (
+                <div className="flex space-x-4 overflow-x-auto pb-2">
+                  {allImages.map((img, index) => (
+                    <motion.img
+                      key={index}
+                      src={img}
+                      alt={`${product.title} - View ${index + 1}`}
+                      className={`
+                        w-24 h-24 object-cover rounded-md cursor-pointer border-2 transition-all duration-300
+                        ${displayMainImage === img ? 'border-cta-copper shadow-lavender-glow' : 'border-divider-silver hover:border-text-lavender'}
+                      `}
+                      onClick={() => {
+                        setMainImage(img);
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/100x100/28242D/F0EAD6?text=Image'; }}
+                    />
+                  ))}
+                </div>
+              )}
             </motion.div>
             
             {/* --- Column 2: Details & Actions --- */}
@@ -151,47 +270,75 @@ export default function ProductDetailPage({ params }: { params: { slug: string }
                 className="font-headings text-5xl text-text-cream font-semibold mb-4"
                 variants={itemVariants}
               >
-                {PageTitle}
+                {product.title}
               </motion.h1>
+              
+              {/* SKU */}
+              {product.sku && (
+                <motion.p className="font-body text-sm text-text-lavender mb-2" variants={itemVariants}>
+                  SKU: {product.sku}
+                </motion.p>
+              )}
+              
               {/* Price (Copper Accent) */}
               <motion.p 
                 className="font-body text-3xl font-bold text-cta-copper mb-6"
                 variants={itemVariants}
               >
-                USD ${mockProduct.price}
+                USD ${formattedPrice}
               </motion.p>
               
               {/* Features/Trust Badges */}
               <motion.div className="flex items-center space-x-4 text-sm mb-8" variants={itemVariants}>
-                  <span className="flex items-center text-text-lavender"><FaCheckCircle className="text-green-500 mr-2"/> In Stock</span>
-                  <span className="flex items-center text-text-lavender"><FaStar className="text-text-cream mr-2"/> 4.8 / 5.0 (12 Reviews)</span>
+                  <span className={`flex items-center text-text-lavender`}>
+                    <FaCheckCircle className={`${product.stock > 0 ? 'text-green-500' : 'text-highlight-wine'} mr-2`}/> 
+                    {product.stock > 0 ? 'In Stock' : 'Out of Stock'}
+                  </span>
+                  {product.stock > 0 && (
+                    <span className="flex items-center text-text-lavender">
+                      {product.stock} available
+                    </span>
+                  )}
               </motion.div>
+              
               {/* Description (Rich Text) */}
-              <motion.p 
-                className="font-body text-text-lavender leading-relaxed mb-8"
-                variants={itemVariants}
-              >
-                {mockProduct.description}
-              </motion.p>
-              {/* Product Features List */}
-              <motion.ul className="mb-10 space-y-3" variants={itemVariants}>
-                  {mockProduct.features.map((feature, index) => (
-                      <li key={index} className="font-body text-text-cream flex items-start">
-                          <span className="text-cta-copper mr-3 mt-1">•</span> {feature}
-                      </li>
-                  ))}
-              </motion.ul>
+              {product.description && (
+                <motion.p 
+                  className="font-body text-text-lavender leading-relaxed mb-8"
+                  variants={itemVariants}
+                >
+                  {product.description}
+                </motion.p>
+              )}
+              
               {/* --- Primary Purchase CTA --- */}
               <motion.div variants={itemVariants}>
-                  <CTAButton className="w-full text-lg py-4" onClick={handleAddToCart}>
-                    Add to Collection (Buy Now)
+                  <CTAButton 
+                    className="w-full text-lg py-4" 
+                    onClick={handleAddToCart}
+                    disabled={product.stock === 0}
+                  >
+                    {product.stock > 0 ? 'Add to Collection (Buy Now)' : 'Out of Stock'}
                   </CTAButton>
               </motion.div>
+              
               {/* --- Reseller Link Explainer Box --- */}
-              <ResellerExplainerBox />
+              {(isLoggedIn && (user?.role === 'reseller' || user?.role === 'admin')) && (
+                <ResellerExplainerBox product={product} onGenerateLink={handleOpenShareModal} />
+              )}
             </div>
           </div>
         </motion.div>
+        
+        {/* Share Link Modal */}
+        {product && (
+          <ShareLinkModal
+            isOpen={isShareModalOpen}
+            onClose={() => setIsShareModalOpen(false)}
+            productId={product.id}
+            onSubmit={handleCreateShareLink}
+          />
+        )}
       </div>
   );
 }

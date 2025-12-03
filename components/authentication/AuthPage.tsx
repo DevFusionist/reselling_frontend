@@ -1,110 +1,28 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import CTAButton from '@/components/ui/CTAButton';
-import { FaEye, FaEyeSlash, FaSpinner } from 'react-icons/fa'; // Assuming react-icons is installed
-
-// --- Utility: Password Strength Checker ---
-const getPasswordStrength = (p: string) => {
-    let score = 0;
-    if (p.length < 8) return { score: 0, text: 'Too Short', color: 'text-highlight-wine' };
-    if (p.match(/[a-z]/)) score++;
-    if (p.match(/[A-Z]/)) score++;
-    if (p.match(/[0-9]/)) score++;
-    if (p.match(/[^a-zA-Z0-9]/)) score++;
-
-    if (score <= 2) return { score: 1, text: 'Weak', color: 'text-highlight-wine' };
-    if (score === 3) return { score: 2, text: 'Medium', color: 'text-cta-copper' };
-    return { score: 3, text: 'Strong', color: 'text-green-500' }; // Use a standard success green
-};
+import Input from '@/components/ui/Input';
+import { FaSpinner } from 'react-icons/fa';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 
-// --- Component for the custom input field with Muted Lavender glow ---
-interface CustomInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label: string;
-  showStrength?: boolean;
+interface AuthPageProps {
+  initialMode?: 'login' | 'signup';
 }
 
-const CustomInput: React.FC<CustomInputProps> = ({ label, id, showStrength = false, ...props }) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  
-  // Determine input type for password toggle
-  const inputType = props.type === 'password' && isPasswordVisible ? 'text' : props.type;
-
-  // Calculate strength if requested and type is password
-  const strength = useMemo(() => {
-    return showStrength && props.value ? getPasswordStrength(props.value as string) : null;
-  }, [showStrength, props.value]);
-
-
-  return (
-    <div className="w-full mb-6">
-      <label htmlFor={id} className="block text-sm font-body text-text-lavender mb-2">
-        {label}
-      </label>
-      <div className="relative">
-        <input
-          id={id}
-          type={inputType} // Use calculated type
-          className={`
-            w-full p-4 font-body text-base bg-base-navy text-text-cream rounded-soft-lg border border-divider-silver
-            transition-all duration-300 ease-[0.25, 0.1, 0.25, 1.0] pr-12
-            focus:outline-none 
-            ${isFocused ? 'shadow-lavender-glow border-text-lavender' : 'border-divider-silver'}
-          `}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          {...props}
-        />
-        
-        {/* Security & UX: Password Visibility Toggle */}
-        {props.type === 'password' && (
-            <button
-                type="button"
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-base-navy hover:text-highlight-wine transition-colors"
-                onClick={() => setIsPasswordVisible(!isPasswordVisible)}
-                tabIndex={-1} // Prevents button from interfering with form tab order
-            >
-                {isPasswordVisible ? <FaEyeSlash /> : <FaEye />}
-            </button>
-        )}
-      </div>
-
-      {/* Accessibility & Error Handling: Password Strength Meter */}
-      {strength && strength.score > 0 && (
-          <div className="mt-2 flex items-center space-x-2">
-            <div className="flex-1 h-1 rounded-full overflow-hidden bg-divider-silver">
-                <motion.div
-                    className="h-full rounded-full"
-                    style={{ 
-                        width: `${(strength.score / 3) * 100}%`,
-                        backgroundColor: strength.color === 'text-highlight-wine' ? '#A32D4C' : 
-                                         strength.color === 'text-cta-copper' ? '#C75A38' : '#22c55e' // Green-500 fallback
-                    }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(strength.score / 3) * 100}%` }}
-                    transition={{ duration: 0.3 }}
-                />
-            </div>
-            <p className={`text-xs font-body ${strength.color}`}>{strength.text}</p>
-          </div>
-      )}
-    </div>
-  );
-};
-
-
-export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
+export default function AuthPage({ initialMode = 'login' }: AuthPageProps) {
+  const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // State for loading animation
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const { login, signup } = useAuth();
+  const router = useRouter();
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
 
@@ -119,13 +37,18 @@ export default function AuthPage() {
     
     // In a real application, connect to Firebase here (simulated 1.5s delay)
     // await signInWithEmailAndPassword(auth, email, password) or await createUserWithEmailAndPassword(auth, email, password)
-    setTimeout(() => {
-        setIsLoading(false);
-        setEmail('');
-        setPassword('');
-        setConfirmPassword('');
-        // If successful, navigate or update global auth state
-    }, 1500);
+    try {
+      if (isLogin) {
+        await login(email, password);
+      } else {
+        await signup(email, password);
+      }
+      router.push('/');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Authentication failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const title = isLogin ? 'Welcome Back, Partner' : 'Create Your Exclusive Account';
@@ -184,7 +107,7 @@ export default function AuthPage() {
 
         <form onSubmit={handleSubmit}>
           
-          <CustomInput 
+          <Input 
             label="Email Address" 
             id="email" 
             type="email" 
@@ -194,7 +117,7 @@ export default function AuthPage() {
             required
           />
           
-          <CustomInput 
+          <Input 
             label="Password" 
             id="password" 
             type="password" 
@@ -206,7 +129,7 @@ export default function AuthPage() {
           />
 
           {!isLogin && (
-            <CustomInput 
+            <Input 
               label="Confirm Password" 
               id="confirmPassword" 
               type="password" 
@@ -243,6 +166,8 @@ export default function AuthPage() {
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError('');
+                // Navigate to the other auth page when switching
+                router.push(isLogin ? '/signup' : '/login');
               }}
               className="text-cta-copper hover:underline font-medium ml-1 transition-colors duration-300"
               type="button"

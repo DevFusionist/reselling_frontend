@@ -3,19 +3,21 @@
 import { motion } from 'framer-motion';
 import React, { useState, useRef } from 'react';
 import CTAButton from '@/components/ui/CTAButton';
-import { FaTag, FaDollarSign, FaBarcode, FaBoxOpen, FaInfoCircle, FaImage, FaTimes, FaUpload, FaSpinner } from 'react-icons/fa'; // Added FaUpload
+import Input from '@/components/ui/Input';
+import Textarea from '@/components/ui/Textarea';
+import Select from '@/components/ui/Select';
+import { FaTag, FaDollarSign, FaBarcode, FaBoxOpen, FaTimes, FaUpload, FaSpinner } from 'react-icons/fa';
+import { apiClient } from '@/lib/api';
 
 // Mock data structure for the product
 interface ProductData {
   id?: string;
   name: string;
-  sku: string;
   retailPrice: number;
   resellerPrice: number;
   costPrice: number;
   inventory: number;
   description: string;
-  dropshippingStatus: 'integrated' | 'manual' | 'n/a';
   imageUrls: string[]; // Still stores URLs, but now generated from upload
 }
 
@@ -24,80 +26,16 @@ interface ProductFormProps {
   isNewProduct?: boolean;
 }
 
-// --- Component for the Custom Textarea Field ---
-interface CustomTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-    label: string;
-}
-
-const CustomTextarea: React.FC<CustomTextareaProps> = ({ label, id, ...props }) => {
-    const [isFocused, setIsFocused] = useState(false);
-    return (
-        <div className="w-full mb-6">
-            <label htmlFor={id} className="block text-sm font-body text-text-lavender mb-2">
-                {label}
-            </label>
-            <textarea
-                id={id}
-                className={`
-                    w-full p-4 font-body text-base bg-base-navy text-text-cream rounded-soft-lg border border-divider-silver
-                    transition-all duration-300 ease-luxury-ease min-h-[150px]
-                    focus:outline-none resize-y
-                    ${isFocused ? 'shadow-lavender-glow border-text-lavender' : 'border-divider-silver'}
-                `}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                {...props}
-            />
-        </div>
-    );
-};
-
-// --- Component for the Custom Input Field (Reusing the luxury focus style) ---
-interface CustomInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label: string;
-  icon: React.ElementType;
-  hint?: string;
-}
-
-const CustomInput: React.FC<CustomInputProps> = ({ label, id, icon: Icon, hint, ...props }) => {
-  const [isFocused, setIsFocused] = useState(false);
-  return (
-    <div className="w-full mb-6">
-      <label htmlFor={id} className="block text-sm font-body text-text-lavender mb-2">
-        {label}
-      </label>
-      <div className="relative">
-        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-text-lavender text-lg" />
-        <input
-          id={id}
-          className={`
-            w-full p-4 pl-12 font-body text-base bg-base-navy text-text-cream rounded-soft-lg border border-divider-silver
-            transition-all duration-300 ease-luxury-ease
-            focus:outline-none 
-            ${isFocused ? 'shadow-lavender-glow border-text-lavender' : 'border-divider-silver'}
-          `}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          {...props}
-        />
-      </div>
-      {hint && <p className="text-xs text-text-lavender/70 mt-1 flex items-center"><FaInfoCircle className="mr-1 text-cta-copper" />{hint}</p>}
-    </div>
-  );
-};
-
 
 // --- Main Product Form Component ---
 export default function ProductForm({ initialData, isNewProduct = true }: ProductFormProps) {
   const defaultData: ProductData = {
     name: '',
-    sku: '',
     retailPrice: 0.00,
     resellerPrice: 0.00,
     costPrice: 0.00,
     inventory: 0,
     description: '',
-    dropshippingStatus: 'n/a',
     imageUrls: [], 
   };
 
@@ -148,20 +86,17 @@ export default function ProductForm({ initialData, isNewProduct = true }: Produc
     if (files.length === 0) return;
 
     setIsUploading(true);
-    // Simulate upload process and get URLs
-    const newUrls: string[] = files.map(file => URL.createObjectURL(file)); // Create blob URLs for preview
+    // Create blob URLs for preview (actual upload happens on form submit)
+    const newUrls: string[] = files.map(file => URL.createObjectURL(file));
     
-    // In a real application, you'd send these files to a backend/storage service
-    // e.g., const uploadedUrls = await uploadImagesToCloudStorage(files);
+    // Store the files for later upload
+    setFormData(prev => ({
+      ...prev,
+      imageUrls: [...prev.imageUrls, ...newUrls],
+    }));
     
-    setTimeout(() => {
-      setFormData(prev => ({
-        ...prev,
-        imageUrls: [...prev.imageUrls, ...newUrls],
-      }));
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = ''; // Clear file input
-    }, 1500); // Simulate network delay
+    setIsUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = ''; // Clear file input
   };
 
   const handleRemoveImage = (urlToRemove: string) => {
@@ -171,7 +106,7 @@ export default function ProductForm({ initialData, isNewProduct = true }: Produc
     }));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Basic validation check
     if (formData.imageUrls.length === 0) {
@@ -181,16 +116,58 @@ export default function ProductForm({ initialData, isNewProduct = true }: Produc
 
     setIsLoading(true);
     
-    // Log the data for submission verification
-    console.log('Submitting Product Data:', formData);
+    try {
+      // Convert image URLs to File objects if they're blob URLs
+      const imageFiles: File[] = [];
+      for (const url of formData.imageUrls) {
+        if (url.startsWith('blob:')) {
+          // Convert blob URL to File
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const file = new File([blob], `image-${Date.now()}.jpg`, { type: blob.type });
+          imageFiles.push(file);
+        } else {
+          // If it's already a URL, we'll need to fetch it or handle differently
+          // For now, skip non-blob URLs in the upload
+          console.warn('Skipping non-blob URL:', url);
+        }
+      }
 
-    // Mock API call simulation
-    setTimeout(() => {
-        setIsLoading(false);
-        // Replace alert with custom modal for production
-        alert(`Successfully ${isNewProduct ? 'added' : 'updated'} ${formData.name}!`); 
-        if (isNewProduct) setFormData(defaultData); 
-    }, 1500);
+      const productData = {
+        title: formData.name,
+        description: formData.description,
+        base_price: formData.retailPrice,
+        reseller_price: formData.resellerPrice,
+        retail_price: formData.retailPrice,
+        stock: formData.inventory,
+      };
+
+      let response;
+      if (isNewProduct) {
+        response = await apiClient.createProduct(productData, imageFiles.length > 0 ? imageFiles : undefined);
+      } else {
+        if (!formData.id) {
+          throw new Error('Product ID is required for updates');
+        }
+        response = await apiClient.updateProduct(parseInt(formData.id), productData, imageFiles.length > 0 ? imageFiles : undefined);
+      }
+
+      if (response.success) {
+        alert(`Successfully ${isNewProduct ? 'added' : 'updated'} ${formData.name}!`);
+        if (isNewProduct) {
+          setFormData(defaultData);
+          // Reset file input
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      } else {
+        throw new Error(response.message || 'Failed to save product');
+      }
+    } catch (error: any) {
+      console.error('Error submitting product:', error);
+      alert(error.message || 'Failed to save product. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Framer Motion variant for the card entrance
@@ -227,31 +204,34 @@ export default function ProductForm({ initialData, isNewProduct = true }: Produc
           
           {/* --- Section 1: Core Details --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-            <CustomInput label="Product Name" id="name" type="text" icon={FaTag} value={formData.name} onChange={handleChange} required />
-            <CustomInput label="SKU / Unique Identifier" id="sku" type="text" icon={FaBarcode} value={formData.sku} onChange={handleChange} required />
-            <CustomInput label="Current Inventory Count" id="inventory" type="number" icon={FaBoxOpen} value={formData.inventory} onChange={handleChange} min="0" required />
-            
-            {/* Dropshipping Status Selector */}
-             <div className="w-full mb-6">
-                <label htmlFor="dropshippingStatus" className="block text-sm font-body text-text-lavender mb-2">
-                    Dropshipping Integration Status
-                </label>
-                <div className="relative">
-                    <select
-                        id="dropshippingStatus"
-                        value={formData.dropshippingStatus}
-                        onChange={handleChange}
-                        className="w-full p-4 font-body text-base bg-base-navy text-text-cream rounded-soft-lg border border-divider-silver appearance-none transition-all duration-300 focus:outline-none focus:shadow-lavender-glow focus:border-text-lavender"
-                    >
-                        <option value="n/a">Not Applicable / Direct Stock</option>
-                        <option value="integrated">Integrated Supplier</option>
-                        <option value="manual">Manual Dropship Required</option>
-                    </select>
-                </div>
-            </div>
+            <Input 
+              label="Product Name" 
+              id="name" 
+              type="text" 
+              icon={FaTag} 
+              value={formData.name} 
+              onChange={handleChange} 
+              required 
+            />
+            <Input 
+              label="Current Inventory Count" 
+              id="inventory" 
+              type="number" 
+              icon={FaBoxOpen} 
+              value={formData.inventory} 
+              onChange={handleChange} 
+              min="0" 
+              required 
+            />
           </div>
           
-          <CustomTextarea label="Product Description (SEO Optimized)" id="description" value={formData.description} onChange={handleChange} required />
+          <Textarea 
+            label="Product Description (SEO Optimized)" 
+            id="description" 
+            value={formData.description} 
+            onChange={handleChange} 
+            required 
+          />
 
 
           {/* --- Section 1.5: Image Management (Uploads) --- */}
@@ -332,7 +312,7 @@ export default function ProductForm({ initialData, isNewProduct = true }: Produc
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8">
             {/* Cost Price */}
-            <CustomInput 
+            <Input 
               label="Cost Price (Your Cost)" 
               id="costPrice" 
               type="number" 
@@ -344,7 +324,7 @@ export default function ProductForm({ initialData, isNewProduct = true }: Produc
               required 
             />
             {/* Reseller Price (Wholesale) */}
-            <CustomInput 
+            <Input 
               label="Reseller Price" 
               id="resellerPrice" 
               type="number" 
@@ -356,7 +336,7 @@ export default function ProductForm({ initialData, isNewProduct = true }: Produc
               required 
             />
             {/* Retail Price (Public) */}
-            <CustomInput 
+            <Input 
               label="Retail Price (Public)" 
               id="retailPrice" 
               type="number" 

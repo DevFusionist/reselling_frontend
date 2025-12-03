@@ -1,18 +1,14 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
-interface User {
-  email: string;
-  // Add more user properties as needed
-}
+import { apiClient, User } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
   isLoggedIn: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  signup: (email: string, password: string, role?: 'admin' | 'customer' | 'reseller') => Promise<void>;
+  logout: () => Promise<void>;
   loading: boolean;
 }
 
@@ -39,52 +35,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      // Mock authentication - replace with actual Firebase/auth service
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await apiClient.login(email, password);
       
-      // In a real app, you would do:
-      // const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // const user = userCredential.user;
-      
-      // For now, mock successful login
-      const userData: User = { email };
-      setUser(userData);
-      localStorage.setItem('velvetZenith_user', JSON.stringify(userData));
-    } catch (error) {
+      if (response.success && response.data) {
+        const userData = response.data.user;
+        setUser(userData);
+        localStorage.setItem('velvetZenith_user', JSON.stringify(userData));
+        // Set cookie for middleware (simple flag)
+        document.cookie = `velvetZenith_auth=true; path=/; max-age=86400; SameSite=Lax`;
+      } else {
+        throw new Error(response.message || 'Login failed');
+      }
+    } catch (error: any) {
       console.error('Login error:', error);
-      throw error;
+      throw new Error(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
-  const signup = async (email: string, password: string) => {
+  const signup = async (email: string, password: string, role: 'admin' | 'customer' | 'reseller' = 'customer') => {
     setLoading(true);
     try {
-      // Mock authentication - replace with actual Firebase/auth service
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await apiClient.signup(email, password, role);
       
-      // In a real app, you would do:
-      // const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      // const user = userCredential.user;
-      
-      // For now, mock successful signup
-      const userData: User = { email };
-      setUser(userData);
-      localStorage.setItem('velvetZenith_user', JSON.stringify(userData));
-    } catch (error) {
+      if (response.success && response.data) {
+        const userData = response.data.user;
+        setUser(userData);
+        localStorage.setItem('velvetZenith_user', JSON.stringify(userData));
+        // Set cookie for middleware (simple flag)
+        document.cookie = `velvetZenith_auth=true; path=/; max-age=86400; SameSite=Lax`;
+        // Also set tokens from signup response
+        if (response.data.accessToken && response.data.refreshToken) {
+          localStorage.setItem('velvetZenith_accessToken', response.data.accessToken);
+          localStorage.setItem('velvetZenith_refreshToken', response.data.refreshToken);
+        }
+      } else {
+        throw new Error(response.message || 'Signup failed');
+      }
+    } catch (error: any) {
       console.error('Signup error:', error);
-      throw error;
+      throw new Error(error.message || 'Signup failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('velvetZenith_user');
+  const logout = async () => {
+    try {
+      const refreshToken = localStorage.getItem('velvetZenith_refreshToken');
+      if (refreshToken) {
+        await apiClient.logout(refreshToken);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('velvetZenith_user');
+      localStorage.removeItem('velvetZenith_accessToken');
+      localStorage.removeItem('velvetZenith_refreshToken');
+      // Clear cookie
+      document.cookie = 'velvetZenith_auth=; path=/; max-age=0';
+    }
   };
 
   return (

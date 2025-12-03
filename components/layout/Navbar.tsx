@@ -32,25 +32,29 @@ const itemVariants = {
 
 // Define the structure for all navigation items
 const navItems = [
-  { label: 'Shop', href: '/shop', icon: FaStore, requiresAuth: false },
-  { label: 'Dashboard', href: '/dashboard', icon: FaChartBar, requiresAuth: true },
-  { label: 'Account', href: '/account', icon: FaUserCircle, requiresAuth: true },
+  { label: 'Shop', href: '/shop', icon: FaStore, requiresAuth: false, allowedRoles: null },
+  { label: 'Dashboard', href: '/dashboard', icon: FaChartBar, requiresAuth: true, allowedRoles: ['admin', 'reseller'] },
+  { label: 'Account', href: '/account', icon: FaUserCircle, requiresAuth: true, allowedRoles: null },
 ];
 
 export default function Navbar() {
-  const { isLoggedIn, logout } = useAuth();
+  const { isLoggedIn, logout, user } = useAuth();
   const { toggleCart, getTotalItems } = useCart();
   const router = useRouter();
   const cartItemCount = getTotalItems();
 
-  // Filter items based on authentication status
-  const visibleNavItems = navItems.filter(item => !item.requiresAuth || isLoggedIn);
+  // Filter items based on authentication status and role
+  const visibleNavItems = navItems.filter(item => {
+    if (item.requiresAuth && !isLoggedIn) return false;
+    if (item.allowedRoles && (!user || !item.allowedRoles.includes(user.role))) return false;
+    return true;
+  });
 
   const handleAuthClick = () => {
     if (isLoggedIn) {
       logout();
     } else {
-      router.push('/account');
+      router.push('/login');
     }
   };
 

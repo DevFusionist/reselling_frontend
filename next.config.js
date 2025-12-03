@@ -4,10 +4,14 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "60e830e8446bb64f54e43b7c0613a05d.r2.cloudflarestorage.com",
+        pathname: "/myecom2025/**"
+      }
+    ]
   },
-  experimental: {
-    appDir: true,
-  },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
