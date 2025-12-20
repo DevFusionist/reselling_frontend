@@ -2,9 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Navbar from '@/components/layout/Navbar';
 import AuthPage from '@/components/authentication/AuthPage';
-import Footer from '@/components/layout/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function SignupPage() {
@@ -29,7 +27,6 @@ export default function SignupPage() {
     <>
       {/* <Navbar /> */}
       <AuthPage initialMode="signup" />
-      {/* <Footer /> */}
     </>
   );
 }

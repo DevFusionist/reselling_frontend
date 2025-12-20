@@ -2,9 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Navbar from '@/components/layout/Navbar';
 import AuthPage from '@/components/authentication/AuthPage';
-import Footer from '@/components/layout/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
@@ -26,11 +24,7 @@ export default function LoginPage() {
   }
 
   return (
-    <>
-      {/* <Navbar /> */}
-      <AuthPage initialMode="login" />
-      {/* <Footer /> */}
-    </>
+    <AuthPage initialMode="login" />
   );
 }
 

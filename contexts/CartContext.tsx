@@ -17,7 +17,7 @@ interface CartContextType {
   openCart: () => void;
   closeCart: () => void;
   toggleCart: () => void;
-  addItem: (item: Omit<CartItem, 'quantity'>) => void;
+  addItem: (item: Omit<CartItem, 'quantity'>, openCart?: boolean) => void;
   removeItem: (id: number) => void;
   updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
@@ -58,7 +58,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const closeCart = () => setIsOpen(false);
   const toggleCart = () => setIsOpen(prev => !prev);
 
-  const addItem = (item: Omit<CartItem, 'quantity'>) => {
+  const addItem = (item: Omit<CartItem, 'quantity'>, openCart: boolean = true) => {
     setItems(prevItems => {
       const existingItem = prevItems.find(i => i.id === item.id);
       if (existingItem) {
@@ -68,7 +68,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       return [...prevItems, { ...item, quantity: 1 }];
     });
-    setIsOpen(true); // Auto-open cart when item is added
+    if (openCart) {
+      setIsOpen(true); // Auto-open cart when item is added (default behavior)
+    }
   };
 
   const removeItem = (id: number) => {

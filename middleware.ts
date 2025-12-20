@@ -19,6 +19,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
+  // Protect authenticated routes - redirect non-logged-in users to login
+  if (!isLoggedIn && (pathname === '/account' || pathname === '/dashboard' || pathname === '/orders')) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
   return NextResponse.next();
 }
 
@@ -26,6 +31,9 @@ export const config = {
   matcher: [
     '/login',
     '/signup',
+    '/account',
+    '/dashboard',
+    '/orders',
   ],
 };
 

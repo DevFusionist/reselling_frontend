@@ -3,17 +3,19 @@
 import { useEffect, useState } from 'react';
 import ProductCard from '@/components/cards/ProductCard';
 import { apiClient, Product } from '@/lib/api';
+import { useApiWithLoader } from '@/hooks/useApiWithLoader';
+import { useLoading } from '@/contexts/LoadingContext';
 
 export default function FeaturedCollection() {
+  const { callWithLoader } = useApiWithLoader();
+  const { isLoading } = useLoading();
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        setLoading(true);
-        const response = await apiClient.getProducts({ limit: 4, page: 1 });
+        const response = await callWithLoader(() => apiClient.getProducts({ limit: 4, page: 1 }));
         if (response.success && response.data) {
           setProducts(response.data.products || []);
         } else {
@@ -22,8 +24,6 @@ export default function FeaturedCollection() {
       } catch (err: any) {
         console.error('Error fetching products:', err);
         setError(err.message || 'Failed to load products');
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -42,7 +42,7 @@ export default function FeaturedCollection() {
     <section className="py-25 max-w-7xl mx-auto px-6">
       <h2 className="font-headings text-5xl text-center text-text-cream mb-20">Curated for Elegance</h2>
 
-      {loading ? (
+      {isLoading ? (
         <div className="flex justify-center items-center py-20">
           <p className="font-body text-text-lavender text-xl">Loading featured products...</p>
         </div>

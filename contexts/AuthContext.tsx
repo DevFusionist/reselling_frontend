@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiClient, User } from '@/lib/api';
+import { useApiWithLoader } from '@/hooks/useApiWithLoader';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +16,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { callWithLoader } = useApiWithLoader();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const response = await apiClient.login(email, password);
+      const response = await callWithLoader(() => apiClient.login(email, password));
       
       if (response.success && response.data) {
         const userData = response.data.user;
@@ -57,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = async (email: string, password: string, role: 'admin' | 'customer' | 'reseller' = 'customer') => {
     setLoading(true);
     try {
-      const response = await apiClient.signup(email, password, role);
+      const response = await callWithLoader(() => apiClient.signup(email, password, role));
       
       if (response.success && response.data) {
         const userData = response.data.user;
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const refreshToken = localStorage.getItem('velvetZenith_refreshToken');
       if (refreshToken) {
-        await apiClient.logout(refreshToken);
+        await callWithLoader(() => apiClient.logout(refreshToken));
       }
     } catch (error) {
       console.error('Logout error:', error);

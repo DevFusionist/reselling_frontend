@@ -17,7 +17,7 @@ export default function Hero() {
   ];
 
   return (
-    <div className="relative h-[80vh] overflow-hidden flex items-center justify-center pt-20">
+    <div className="relative h-[80vh] overflow-hidden flex items-center justify-center pt-24">
       
       {/* Hero Slider as the background, with parallax effect */}
       <motion.div 

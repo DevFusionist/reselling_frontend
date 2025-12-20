@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import CTAButton from '@/components/ui/CTAButton';
-import { FaSpinner, FaCopy, FaCheckCircle } from 'react-icons/fa';
+import { FaCopy, FaCheckCircle } from 'react-icons/fa';
 import { FaDollarSign, FaCalendarAlt } from 'react-icons/fa';
 
 interface ShareLinkModalProps {
@@ -161,14 +161,7 @@ export default function ShareLinkModal({ isOpen, onClose, productId, onSubmit }:
               Cancel
             </CTAButton>
             <CTAButton type="submit" className="flex-1" disabled={isLoading}>
-              {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <FaSpinner className="animate-spin mr-2" />
-                  Generating...
-                </div>
-              ) : (
-                'Generate Link'
-              )}
+              Generate Link
             </CTAButton>
           </div>
         </form>

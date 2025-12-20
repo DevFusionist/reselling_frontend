@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import React, { useState } from 'react';
 import CTAButton from '@/components/ui/CTAButton';
 import Input from '@/components/ui/Input';
-import { FaSpinner } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -142,14 +141,7 @@ export default function AuthPage({ initialMode = 'login' }: AuthPageProps) {
 
           {/* Submit Button (Copper CTA) - Loading State Animation */}
           <CTAButton type="submit" className="w-full mt-4" disabled={isLoading}>
-            {isLoading ? (
-                <div className="flex items-center justify-center">
-                    <FaSpinner className="animate-spin mr-2" />
-                    Processing...
-                </div>
-            ) : (
-                submitLabel
-            )}
+            {submitLabel}
           </CTAButton>
         </form>
 

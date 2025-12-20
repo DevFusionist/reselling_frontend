@@ -7,6 +7,8 @@ import CTAButton from "@/components/ui/CTAButton";
 import { FaCheckCircle } from "react-icons/fa";
 import { apiClient } from "@/lib/api";
 import { useCart } from "@/contexts/CartContext";
+import { useApiWithLoader } from "@/hooks/useApiWithLoader";
+import { useLoading } from "@/contexts/LoadingContext";
 
 // ---------------------------------------
 // MOTION VARIANTS
@@ -29,18 +31,19 @@ const itemVariants = {
 // ---------------------------------------
 const ShareProductPage = ({ params }: { params: { code: string } }) => {
   const { addItem } = useCart();
+  const { callWithLoader } = useApiWithLoader();
+  const { isLoading } = useLoading();
 
   const [product, setProduct] = useState<any>(null);
   const [images, setImages] = useState<string[]>([]);
   const [mainImage, setMainImage] = useState("");
-  const [loading, setLoading] = useState(true);
 
   const productCode = params.code;
 
   // Fetch product by share link code
   const fetchProductDetails = async () => {
     try {
-      const res = await apiClient.fetchProductDataByShareLinkCode(productCode);
+      const res = await callWithLoader(() => apiClient.fetchProductDataByShareLinkCode(productCode));
       if (res.success && res.data) {
         const p = res.data.product;
 
@@ -54,14 +57,12 @@ const ShareProductPage = ({ params }: { params: { code: string } }) => {
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchProductDetails();
-  }, []);
+  }, [productCode]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -75,12 +76,8 @@ const ShareProductPage = ({ params }: { params: { code: string } }) => {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-base-navy font-body py-20 flex items-center justify-center">
-        <p className="text-text-lavender text-xl">Loading product...</p>
-      </div>
-    );
+  if (isLoading) {
+    return null; // Global loader handles this
   }
 
   if (!product) {

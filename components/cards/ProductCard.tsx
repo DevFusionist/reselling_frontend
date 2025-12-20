@@ -20,13 +20,14 @@ export default function ProductCard({ product }: ProductCardProps) {
   const productUrl = `/shop/${productSlug}`;
 
   return (
-    <Link href={productUrl} className="block">
+    <Link href={productUrl} className="block h-full">
       <motion.div
         className="
           bg-card-taupe rounded-soft-lg p-5 
           shadow-luxury-soft cursor-pointer
           transition-all duration-500 ease-luxury-ease
           group relative overflow-hidden
+          h-full flex flex-col
         "
       // Entrance animation: Fade-in and slide up when scrolling into view
       initial={{ opacity: 0, y: 40 }}
@@ -69,16 +70,16 @@ export default function ProductCard({ product }: ProductCardProps) {
       </div>
 
       {/* Product Title */}
-      <h3 className="font-body text-lg text-text-cream font-medium">
+      <h3 className="font-body text-lg text-text-cream font-medium mb-2 line-clamp-2 min-h-[3rem]">
         {product.name}
       </h3>
 
       {/* Price */}
-      <p className="font-body text-text-lavender">USD ${product.price}</p>
+      <p className="font-body text-text-lavender mb-4">USD ${product.price}</p>
 
       {/* CTA Appears on Hover */}
       <motion.div
-        className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        className="mt-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300"
       >
         <CTAButton className="w-full text-base">View Details</CTAButton>
       </motion.div>

@@ -2,8 +2,6 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { FaUserCircle, FaEnvelope, FaShieldAlt, FaCalendarAlt } from 'react-icons/fa';
@@ -19,11 +17,7 @@ export default function AccountPage() {
   }, [isLoggedIn, loading, router]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-base-navy">
-        <div className="text-text-cream">Loading...</div>
-      </div>
-    );
+    return null; // Global loader will handle this
   }
 
   if (!isLoggedIn || !user) {
@@ -40,10 +34,8 @@ export default function AccountPage() {
   };
 
   return (
-    <>
-      <Navbar />
-      <div className="min-h-screen bg-base-navy pt-24 pb-12 px-4">
-        <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-base-navy pt-24 pb-12 px-4">
+      <div className="max-w-4xl mx-auto">
           <motion.div
             variants={cardVariants}
             initial="hidden"
@@ -116,10 +108,8 @@ export default function AccountPage() {
                 )}
               </div>
             </div>
-          </motion.div>
-        </div>
+        </motion.div>
       </div>
-      <Footer />
-    </>
+    </div>
   );
 }

@@ -43,8 +43,8 @@ export default function Input({
   // Determine input type for password toggle
   const inputType = type === 'password' && isPasswordVisible ? 'text' : type;
   
-  // Remove type from props to avoid duplicate
-  const { type: _, ...inputProps } = props as any;
+  // Remove type and required from props to avoid duplicate
+  const { type: _, required, ...inputProps } = props as any;
 
   // Calculate strength if requested and type is password
   const strength = useMemo(() => {
@@ -59,6 +59,7 @@ export default function Input({
       {label && (
         <label htmlFor={id} className="block text-sm font-body text-text-lavender mb-2">
           {label}
+          {required && <span className="text-highlight-wine ml-1">*</span>}
         </label>
       )}
       <div className="relative">
@@ -72,12 +73,13 @@ export default function Input({
             w-full p-4 font-body text-base bg-base-navy text-text-cream rounded-soft-lg border transition-all duration-300 ease-[0.25, 0.1, 0.25, 1.0]
             ${hasIcon ? 'pl-12' : 'pl-4'}
             ${isPassword ? 'pr-12' : 'pr-4'}
-            ${error ? 'border-highlight-wine' : isFocused ? 'shadow-lavender-glow border-text-lavender' : 'border-divider-silver'}
+            ${error ? 'border-highlight-wine' : isFocused ? 'shadow-lavender-glow border-text-lavender' : required ? 'border-cta-copper/50' : 'border-divider-silver'}
             focus:outline-none
             ${className}
           `}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
+          required={required}
           {...inputProps}
         />
         

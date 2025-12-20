@@ -3,9 +3,11 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Poppins } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
+import { LoadingProvider } from "@/contexts/LoadingContext";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import CartSlider from "@/components/cart/CartSlider";
+import Loader from "@/components/ui/Loader";
 
 // 🔠 Typography Pairing Implementation
 const cormorant = Cormorant_Garamond({
@@ -37,14 +39,17 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${poppins.variable}`}>
       <body className="antialiased min-h-screen">
-        <AuthProvider>
-          <CartProvider>
-            <Navbar />
-            {children}
-            <Footer />
-            <CartSlider />
-          </CartProvider>
-        </AuthProvider>
+        <LoadingProvider>
+          <AuthProvider>
+            <CartProvider>
+              <Navbar />
+              {children}
+              <Footer />
+              <CartSlider />
+              <Loader />
+            </CartProvider>
+          </AuthProvider>
+        </LoadingProvider>
       </body>
     </html>
   );

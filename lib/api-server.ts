@@ -47,33 +47,72 @@ export async function fetchProductServerSide(
   try {
     const url = `${API_BASE_URL}/products/${productId}`;
     
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // Add cache revalidation for better performance
-      next: { revalidate: 60 }, // Revalidate every 60 seconds
-    });
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        // Add cache revalidation for better performance
+        next: { revalidate: 60 }, // Revalidate every 60 seconds
+      });
 
-    if (!response.ok) {
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: `Failed to fetch product: ${response.statusText}`,
+        };
+      }
+
+      const data = await response.json();
+      
+      // Log for debugging - remove in production
+      console.log('Server-side product fetch response:', JSON.stringify(data, null, 2));
+      
+      return data;
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      
+      // Handle abort (timeout)
+      if (fetchError.name === 'AbortError') {
+        console.warn(`Server-side product fetch timeout for product ${productId}`);
+        return {
+          success: false,
+          message: 'Request timeout - backend server may be unavailable',
+        };
+      }
+      
+      throw fetchError; // Re-throw to be caught by outer catch
+    }
+  } catch (error: any) {
+    // Handle network errors gracefully
+    const errorMessage = error.message || 'Failed to fetch product';
+    const isNetworkError = 
+      error.code === 'UND_ERR_SOCKET' ||
+      error.message?.includes('fetch failed') ||
+      error.message?.includes('ECONNREFUSED') ||
+      error.message?.includes('other side closed');
+    
+    if (isNetworkError) {
+      console.warn(`Server-side product fetch network error for product ${productId}:`, errorMessage);
+      console.warn('Backend server may not be running or is unreachable at:', API_BASE_URL);
       return {
         success: false,
-        message: `Failed to fetch product: ${response.statusText}`,
+        message: 'Backend server unavailable - product data will be loaded client-side',
       };
     }
-
-    const data = await response.json();
     
-    // Log for debugging - remove in production
-    console.log('Server-side product fetch response:', JSON.stringify(data, null, 2));
-    
-    return data;
-  } catch (error: any) {
     console.error('Server-side product fetch error:', error);
     return {
       success: false,
-      message: error.message || 'Failed to fetch product',
+      message: errorMessage,
     };
   }
 }

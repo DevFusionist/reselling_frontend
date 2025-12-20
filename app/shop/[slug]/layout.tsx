@@ -96,6 +96,15 @@ export default async function ProductLayout({
     // Fetch real product data
     const response = await fetchProductServerSide(productId);
 
+    // If fetch fails, log warning but continue - client-side will handle loading
+    if (!response.success) {
+      // Only log in development to avoid noise in production
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`Server-side product fetch failed for product ${productId}:`, response.message);
+        console.warn('Product data will be loaded client-side instead.');
+      }
+    }
+
     if (response.success && response.data) {
       try {
         // API response structure: product fields directly on data, with images array

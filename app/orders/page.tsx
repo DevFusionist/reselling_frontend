@@ -5,10 +5,10 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { apiClient, Order } from '@/lib/api';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
-import { FaBox, FaClock, FaCheckCircle, FaTimesCircle, FaSpinner } from 'react-icons/fa';
+import { FaBox, FaClock, FaCheckCircle, FaTimesCircle, FaSpinner, FaCreditCard } from 'react-icons/fa';
 import Link from 'next/link';
+import { useApiWithLoader } from '@/hooks/useApiWithLoader';
+import { useLoading } from '@/contexts/LoadingContext';
 
 const statusColors: Record<string, string> = {
   pending: 'text-yellow-500',
@@ -16,6 +16,7 @@ const statusColors: Record<string, string> = {
   shipped: 'text-purple-500',
   delivered: 'text-green-500',
   cancelled: 'text-highlight-wine',
+  paid: 'text-green-600',
 };
 
 const statusIcons: Record<string, React.ElementType> = {
@@ -24,13 +25,15 @@ const statusIcons: Record<string, React.ElementType> = {
   shipped: FaBox,
   delivered: FaCheckCircle,
   cancelled: FaTimesCircle,
+  paid: FaCreditCard,
 };
 
 export default function OrdersPage() {
+  const { callWithLoader } = useApiWithLoader();
+  const { isLoading } = useLoading();
   const { isLoggedIn, loading: authLoading, user } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,9 +47,8 @@ export default function OrdersPage() {
       if (!isLoggedIn) return;
 
       try {
-        setLoading(true);
         setError(null);
-        const response = await apiClient.getOrders({ page: 1, limit: 50 });
+        const response = await callWithLoader(() => apiClient.getOrders({ page: 1, limit: 50 }));
         
         if (response.success && response.data) {
           setOrders(response.data.orders || []);
@@ -56,8 +58,6 @@ export default function OrdersPage() {
       } catch (err: any) {
         console.error('Error fetching orders:', err);
         setError(err.message || 'Failed to load orders');
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -66,16 +66,8 @@ export default function OrdersPage() {
     }
   }, [isLoggedIn]);
 
-  if (authLoading || loading) {
-    return (
-      <>
-        <Navbar />
-        <div className="min-h-screen bg-base-navy pt-20 pb-20 flex items-center justify-center">
-          <p className="font-body text-xl text-text-lavender">Loading...</p>
-        </div>
-        <Footer />
-      </>
-    );
+  if (authLoading || isLoading) {
+    return null; // Global loader will handle this
   }
 
   if (!isLoggedIn) {
@@ -83,9 +75,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <>
-      <Navbar />
-      <div className="min-h-screen bg-base-navy pt-20 pb-20">
+    <div className="min-h-screen bg-base-navy pt-20 pb-20">
         <div className="max-w-7xl mx-auto px-6 py-10">
           <motion.h1 
             className="font-headings text-5xl text-text-cream font-semibold mb-4"
@@ -102,7 +92,7 @@ export default function OrdersPage() {
             </div>
           )}
 
-          {orders.length === 0 && !loading && (
+          {orders.length === 0 && !isLoading && (
             <div className="text-center py-20">
               <FaBox className="mx-auto text-6xl text-text-lavender/50 mb-4" />
               <p className="font-body text-xl text-text-lavender mb-6">No orders yet</p>
@@ -171,7 +161,10 @@ export default function OrdersPage() {
                             </div>
                           </div>
                           <p className="font-body text-text-cream font-semibold">
-                            ${(item.price * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ${(typeof (item as any).total_price === 'string' 
+                              ? parseFloat((item as any).total_price) 
+                              : (item.price || 0) * item.quantity
+                            ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </div>
                       ))}
@@ -179,7 +172,10 @@ export default function OrdersPage() {
                     <div className="mt-4 pt-4 border-t border-divider-silver flex justify-between items-center">
                       <span className="font-body text-text-lavender">Total:</span>
                       <span className="font-headings text-2xl text-cta-copper font-semibold">
-                        ${order.total_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${(typeof order.total_amount === 'string' 
+                          ? parseFloat(order.total_amount) 
+                          : order.total_amount
+                        ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>
@@ -189,8 +185,6 @@ export default function OrdersPage() {
           </div>
         </div>
       </div>
-      <Footer />
-    </>
   );
 }
 
