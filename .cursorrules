@@ -1,0 +1,318 @@
+📘 CommerceOS Frontend – Comprehensive Developer Guide
+
+Tech Stack: Next.js 14+ (App Router), React Server Components (RSC), TypeScript, Tailwind CSS.
+
+This manual provides step-by-step instructions to build the Multi-Model E-Commerce Platform (Direct Sales + Reseller Commissions). It is designed for developers who need to implement high-performance Server-Side Rendering (SSR) for SEO and Client-Side Interactivity for the dashboard.
+
+🛠️ 1. System Requirements & Setup
+
+Prerequisites
+
+Node.js: v18.17 or later (Required for Next.js 14).
+
+Backend: The backend API (Auth, Products, Orders) must be running.
+
+Package Manager: npm or pnpm (recommended for speed).
+
+Installation
+
+Initialize the Project:
+
+npx create-next-app@latest commerce-os-next --typescript --tailwind --eslint
+# Prompts:
+# - Use App Router? Yes
+# - Use src/ directory? Yes
+# - Import alias? @/*
+
+
+Install Core Dependencies:
+
+# UI & Icons
+npm install lucide-react clsx tailwind-merge
+
+# HTTP & State
+npm install axios @tanstack/react-query zustand
+
+# Utilities
+npm install date-fns zod
+
+
+Environment Configuration:
+Create a .env.local file in the root. Next.js strictly separates server-side secrets from client-side public variables.
+
+# ------------------------------
+# 🔒 SERVER-SIDE ONLY (RSC & API Routes)
+# ------------------------------
+API_SECRET_KEY=live_sk_992834...
+INTERNAL_API_URL=http://backend-service:3000
+
+# ------------------------------
+# 🌍 CLIENT ACCESSIBLE (Browser)
+# ------------------------------
+NEXT_PUBLIC_API_URL=https://api.commerceos.com
+NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_123456789
+NEXT_PUBLIC_SITE_URL=https://commerceos.com
+
+
+🏗️ 2. Architecture Deep Dive
+
+React Server Components (RSC) vs. Client Components
+
+This project uses a hybrid approach. You must understand where to draw the boundary.
+
+Feature
+
+Component Type
+
+Reason
+
+Product Page
+
+Server Component
+
+Needs SEO, OpenGraph tags, and initial data load.
+
+Navbar
+
+Server Component
+
+Static content, can fetch user session on server.
+
+Add to Cart
+
+Client Component
+
+Needs onClick handlers and browser state.
+
+Wallet Dashboard
+
+Client Component
+
+Highly interactive, needs useEffect for live polling.
+
+Razorpay Button
+
+Client Component
+
+Depends on window object.
+
+Folder Structure (Best Practice)
+
+src/
+├── app/
+│   ├── (auth)/                # Route Group (doesn't affect URL path)
+│   │   ├── login/page.tsx
+│   │   └── register/page.tsx
+│   ├── dashboard/             # Protected Routes
+│   │   ├── layout.tsx         # Dashboard Shell (Sidebar)
+│   │   └── page.tsx           # Main Wallet View
+│   ├── product/[slug]/        # Dynamic Product Routes
+│   │   ├── loading.tsx        # Suspense Fallback (Skeleton)
+│   │   └── page.tsx           # Main Product Page (RSC)
+│   ├── api/auth/[...nextauth] # (Optional) If using NextAuth.js
+│   ├── layout.tsx             # Root Layout
+│   └── page.tsx               # Homepage
+├── components/
+│   ├── server/                # RSCs (e.g., PriceTag)
+│   └── client/                # Client components (e.g., BuyButton)
+├── lib/
+│   ├── actions.ts             # Server Actions (Mutations)
+│   ├── session.ts             # Cookie/JWT handling
+│   └── utils.ts
+└── middleware.ts              # Edge Middleware
+
+
+💻 3. Implementation Details
+
+A. The Product Page (SEO & Reseller Logic)
+
+This is the most critical part of the app. It must read the shareId URL parameter on the server to render the discounted price for bots (WhatsApp/Google).
+
+File: src/app/product/[slug]/page.tsx
+
+import { Suspense } from 'react';
+import { notFound } from 'next/navigation';
+import { ProductDetails } from '@/components/server/ProductDetails';
+import { ProductSkeleton } from '@/components/ui/skeletons';
+
+// 1. Dynamic Metadata (Server-Side)
+export async function generateMetadata({ params, searchParams }: any) {
+  const { slug } = params;
+  const { shareId } = searchParams;
+  
+  // Fetch just enough data for meta tags
+  const product = await fetch(`${process.env.INTERNAL_API_URL}/products/${slug}/meta?shareId=${shareId}`).then(r => r.json());
+  
+  return {
+    title: product.dealTitle || product.name,
+    description: `Get it for ₹${product.price}`,
+    openGraph: { images: [product.thumbnail] },
+  };
+}
+
+// 2. Main Page with Streaming
+export default function Page({ params, searchParams }: any) {
+  return (
+    <main className="container mx-auto px-4 py-8">
+      {/* Suspense allows the page shell (header/footer) to load instantly.
+        The ProductDetails component streams in when the backend responds.
+      */}
+      <Suspense fallback={<ProductSkeleton />}>
+        <ProductDetails slug={params.slug} shareId={searchParams.shareId} />
+      </Suspense>
+    </main>
+  );
+}
+
+
+B. Authentication Middleware
+
+Since we cannot use React Context in Server Components easily, we use Next.js Middleware to protect routes at the edge.
+
+File: src/middleware.ts
+
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export function middleware(request: NextRequest) {
+  // Check for auth cookie (HttpOnly)
+  const token = request.cookies.get('auth_token')?.value;
+  
+  const isDashboard = request.nextUrl.pathname.startsWith('/dashboard');
+  const isLoginPage = request.nextUrl.pathname.startsWith('/login');
+
+  // 1. Protect Dashboard
+  if (isDashboard && !token) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  // 2. Redirect logged-in users away from Login page
+  if (isLoginPage && token) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ['/dashboard/:path*', '/login'],
+};
+
+
+C. Server Actions (The "No API" Approach)
+
+Handle form submissions (like adding to cart) without client-side JavaScript for the submission logic.
+
+File: src/lib/actions.ts
+
+'use server'
+
+import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+
+export async function addToCart(formData: FormData) {
+  const productId = formData.get('productId');
+  const shareId = formData.get('shareId');
+  
+  const token = cookies().get('auth_token')?.value;
+
+  try {
+    await fetch(`${process.env.INTERNAL_API_URL}/cart`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ productId, shareId, quantity: 1 })
+    });
+
+    // Purge the cache for the cart path so the UI updates
+    revalidatePath('/cart');
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: 'Failed to add to cart' };
+  }
+}
+
+
+🚀 4. Performance Optimization Checklist
+
+Image Optimization:
+Always use next/image. It prevents Layout Shift (CLS) and serves WebP.
+
+<Image 
+  src={product.image} 
+  alt={product.name} 
+  width={600} 
+  height={600} 
+  priority={true} // Prioritize LCP image
+/>
+
+
+Route Groups:
+Use (auth) folder to group login/register routes. This ensures they don't add /auth/ to the URL but keeps code organized.
+
+Static vs. Dynamic Rendering:
+
+Landing Page: Should be static (default).
+
+Product Page: Dynamic (depends on shareId). Next.js usually auto-detects this usage of searchParams and switches to dynamic rendering.
+
+🚢 5. Deployment Guide
+
+Option A: Vercel (Recommended)
+
+Zero configuration required.
+
+Push code to GitHub.
+
+Import project in Vercel.
+
+Add Environment Variables in Vercel Dashboard.
+
+Deploy.
+
+Option B: Docker (Self-Hosted)
+
+For hosting on AWS EC2 or DigitalOcean.
+
+Dockerfile:
+
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV production
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+EXPOSE 3000
+CMD ["node", "server.js"]
+
+
+❓ Troubleshooting Common Issues
+
+Q: Why is localStorage undefined?
+A: You are trying to access browser APIs in a Server Component. Move that logic to a Client Component ('use client') or use useEffect.
+
+Q: Why do my reseller links show the wrong price on WhatsApp?
+A: Ensure your generateMetadata function in page.tsx is async and fetching the price using the shareId from searchParams. Do not rely on client-side fetching for meta tags.
+
+Q: Styles are missing on initial load?
+A: Ensure you are importing globals.css in src/app/layout.tsx.
+

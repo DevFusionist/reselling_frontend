@@ -1,5 +1,36 @@
 {
-  "node": {},
+  "node": {
+    "00d9324c6efa5d2b71e8cbb1d8c8ff3942913c8a27": {
+      "workers": {
+        "app/dashboard/page": {
+          "moduleId": 30244,
+          "async": false,
+          "exportedName": "logout",
+          "filename": "src/lib/actions.ts"
+        }
+      },
+      "layer": {
+        "app/dashboard/page": "action-browser"
+      },
+      "filename": "src/lib/actions.ts",
+      "exportedName": "logout"
+    },
+    "4042cc30ba497c03a9c82e9b36694dd6cd48b50946": {
+      "workers": {
+        "app/product/[slug]/page": {
+          "moduleId": 99103,
+          "async": false,
+          "exportedName": "addToCart",
+          "filename": "src/lib/actions.ts"
+        }
+      },
+      "layer": {
+        "app/product/[slug]/page": "action-browser"
+      },
+      "filename": "src/lib/actions.ts",
+      "exportedName": "addToCart"
+    }
+  },
   "edge": {},
-  "encryptionKey": "1VGXxP3VdrwHAg+BpEqYG4B53QLYZwD8osa/3TgIEMo="
+  "encryptionKey": "yHfx76yyicPJt3HbkqKDkgKZl0XutUKDGlJkMIPPZFI="
 }
