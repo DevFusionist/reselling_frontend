@@ -1,10 +1,8 @@
 {
+  "/page": "app/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(auth)/register/page": "app/(auth)/register/page.js",
-  "/_global-error/page": "app/_global-error/page.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/page": "app/page.js",
-  "/product/[slug]/page": "app/product/[slug]/page.js"
+  "/(shop)/orders/page": "app/(shop)/orders/page.js",
+  "/(shop)/admin/page": "app/(shop)/admin/page.js"
 }

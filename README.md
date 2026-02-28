@@ -1,114 +1,119 @@
-# CommerceOS Frontend
+# Reseller E-commerce Frontend
 
-Multi-Model E-Commerce Platform (Direct Sales + Reseller Commissions) built with Next.js 14+ (App Router), React Server Components (RSC), TypeScript, and Tailwind CSS.
+Modern, SEO-optimized e-commerce frontend built with Next.js 14+, TypeScript, Tailwind CSS, and shadcn UI.
 
 ## Features
 
-- 🚀 **Server-Side Rendering (SSR)** for SEO optimization
-- 🔐 **Authentication** with cookie-based sessions
-- 💰 **Wallet Dashboard** for tracking earnings and commissions
-- 🛍️ **Product Pages** with dynamic metadata for social sharing
-- 🔗 **Reseller Links** with shareId parameter support
-- 📱 **Responsive Design** with Tailwind CSS
-- ⚡ **Performance Optimized** with Next.js Image optimization
+- 🚀 **Next.js 14+** with App Router and Server-Side Rendering
+- 🎨 **Modern UI** with Tailwind CSS and shadcn/ui components
+- ✨ **GSAP Animations** for smooth, interactive experiences
+- 📱 **Fully Responsive** design for all devices
+- 🔐 **Authentication** with JWT tokens
+- 🛒 **Shopping Cart** with persistent storage
+- 💳 **Razorpay Integration** for payments
+- 👥 **Multi-role Support** (Admin, Customer, Reseller)
+- 💰 **Wallet System** for resellers
+- 🔗 **Share Links** for reseller marketing
+- 📊 **SEO Optimized** with proper metadata and SSR
 
 ## Tech Stack
 
-- **Framework:** Next.js 16+ (App Router)
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **Icons:** Lucide React
-- **HTTP Client:** Axios
-- **State Management:** Zustand, React Query
-- **Validation:** Zod
-- **Date Handling:** date-fns
+- **Framework**: Next.js 14+ (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **UI Components**: shadcn/ui
+- **Animations**: GSAP
+- **State Management**: Zustand, React Context
+- **Forms**: React Hook Form + Zod
+- **HTTP Client**: Axios
+- **Icons**: Lucide React
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js v18.17 or later
-- Backend API must be running (Auth, Products, Orders endpoints)
+- Node.js 18+
+- npm or yarn
+- Backend API running (see reseller-backend)
 
 ### Installation
 
-1. Clone the repository
-2. Install dependencies:
+1. Clone the repository:
+```bash
+cd my-app
+```
 
+2. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Create a `.env.local` file in the root directory:
-
+3. Create a `.env.local` file:
 ```env
-# Server-Side Only (RSC & API Routes)
-API_SECRET_KEY=your_secret_key
-INTERNAL_API_URL=http://backend-service:3000
-
-# Client Accessible (Browser)
-NEXT_PUBLIC_API_URL=https://api.commerceos.com
-NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_123456789
-NEXT_PUBLIC_SITE_URL=https://commerceos.com
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
+NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxxx
 ```
 
 4. Run the development server:
-
 ```bash
 npm run dev
 ```
 
-5. Open [http://localhost:5000](http://localhost:5000) in your browser
+5. Open [http://localhost:3001](http://localhost:3001) in your browser.
 
 ## Project Structure
 
 ```
-src/
-├── app/
-│   ├── (auth)/                # Route Group (doesn't affect URL path)
-│   │   ├── login/page.tsx
-│   │   └── register/page.tsx
-│   ├── dashboard/             # Protected Routes
-│   │   ├── layout.tsx         # Dashboard Shell (Sidebar)
-│   │   └── page.tsx           # Main Wallet View
-│   ├── product/[slug]/        # Dynamic Product Routes
-│   │   ├── loading.tsx        # Suspense Fallback (Skeleton)
-│   │   └── page.tsx           # Main Product Page (RSC)
-│   ├── layout.tsx             # Root Layout
-│   └── page.tsx               # Homepage
-├── components/
-│   ├── server/                # RSCs (e.g., ProductDetails)
-│   ├── client/                # Client components (e.g., BuyButton)
-│   └── ui/                    # UI Components (e.g., Skeletons)
-├── lib/
-│   ├── actions.ts             # Server Actions (Mutations)
-│   ├── session.ts             # Cookie/JWT handling
-│   └── utils.ts               # Utility functions
-└── middleware.ts              # Edge Middleware
+my-app/
+├── app/                    # Next.js App Router pages
+│   ├── (auth)/            # Authentication pages
+│   ├── (shop)/            # Shop pages
+│   ├── product/[slug]/    # Product detail pages (SSR)
+│   └── layout.tsx         # Root layout
+├── components/            # React components
+│   ├── ui/               # shadcn/ui components
+│   ├── layout/           # Layout components
+│   └── product/          # Product components
+├── contexts/             # React contexts
+├── hooks/                # Custom hooks
+├── lib/                  # Utilities and API client
+├── services/             # API service functions
+└── types/                # TypeScript types
 ```
 
-## Key Features Implementation
+## Key Features
 
-### Product Pages with SEO & Reseller Logic
+### Authentication
+- JWT-based authentication
+- Automatic token refresh
+- Protected routes
+- Role-based access control
 
-Product pages use Server Components to fetch and render product data on the server, ensuring proper SEO and correct pricing for reseller links (shareId parameter).
+### Products
+- Product listing with pagination
+- Product detail pages (SSR for SEO)
+- Category filtering
+- Search functionality
+- Variant selection
 
-### Authentication Middleware
+### Cart
+- Persistent cart (localStorage)
+- Quantity management
+- Price calculations
+- Empty state handling
 
-Routes are protected at the edge using Next.js Middleware. The middleware checks for authentication tokens and redirects users accordingly.
+### Checkout
+- Multi-step checkout flow
+- Address management
+- Razorpay payment integration
+- Order confirmation
 
-### Server Actions
-
-Form submissions (like adding to cart) are handled using Server Actions, eliminating the need for separate API routes.
-
-## Deployment
-
-### Vercel (Recommended)
-
-1. Push code to GitHub
-2. Import project in Vercel
-3. Add environment variables in Vercel Dashboard
-4. Deploy
+### Reseller Features
+- Wallet dashboard
+- Transaction history
+- Payout requests
+- Share link generation
+- Link statistics
 
 ## Development
 
@@ -125,17 +130,28 @@ npm start
 npm run lint
 ```
 
-## Troubleshooting
+## Environment Variables
 
-**Q: Why is localStorage undefined?**
-A: You are trying to access browser APIs in a Server Component. Move that logic to a Client Component ('use client') or use useEffect.
+- `NEXT_PUBLIC_API_BASE_URL` - Backend API URL
+- `NEXT_PUBLIC_RAZORPAY_KEY_ID` - Razorpay Key ID
 
-**Q: Why do my reseller links show the wrong price on WhatsApp?**
-A: Ensure your generateMetadata function in page.tsx is async and fetching the price using the shareId from searchParams. Do not rely on client-side fetching for meta tags.
+## Performance Optimization
 
-**Q: Styles are missing on initial load?**
-A: Ensure you are importing globals.css in src/app/layout.tsx.
+- Server-Side Rendering for SEO-critical pages
+- Image optimization with Next.js Image
+- Code splitting and lazy loading
+- Proper caching strategies
+- Bundle size optimization
+
+## SEO
+
+- Server-Side Rendering
+- Proper metadata for all pages
+- Structured data (JSON-LD)
+- Semantic HTML
+- Sitemap generation
 
 ## License
 
-Private - All rights reserved
+MIT
+
